@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Checklist PDF Export</title>
+  <script src="https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      padding: 20px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+    td {
+      padding: 8px;
+      border: 1px solid #ccc;
+    }
+    button {
+      margin-top: 20px;
+      padding: 10px 20px;
+    }
+  </style>
+</head>
+<body>
+
+  <h1>Checklist</h1>
+  <table id="checklistTable"></table>
+  
+  <label for="dateInput">Date:</label>
+  <input type="date" id="dateInput">
+  <button onclick="exportToPDF()">Export PDF</button>
+  <button onclick="checkAll(true)">Check All</button>
+  <button onclick="checkAll(false)">Uncheck All</button>
+
+  <script>
+    const data = [
+      { name: "Login in Dayforce", status: "✔" },
+      { name: "Kasse zählen (FO + Bar +Vending > alle Tische müssen geschlossen sein/übergeben!)", status: "✔" },
+      { name: "Übergabe lesen / Masterkey Kontrolle", status: "✔" },
+      { name: "Eingangsbereich vor dem Hotel checken (Müll + leere Flaschen sammeln)", status: "✔" },
+      { name: "Guests InHouse List ausdrucken + Contingency Reports checken", status: "✔" },
+      { name: "Tür schließen ab 23 Uhr (von draußen nur noch mit Schlüsselkarte zu öffnen)", status: "✔" },
+      { name: "Emails bearbeiten und Booking.com Nachrichten", status: "✔" },
+      { name: "Charge Deposits for NONFLEX Booking.com Rates", status: "✔" },
+      { name: "BQRKB am jeweiligen Wochentag ausfüllen (pro Woche FR bis DO)", status: "✔" },
+      { name: "NUR donnerstags: Vending Machine Einnahmen in der Barkasse buchen + am Automat „Kurzstatistik\" löschen", status: "✔" },
+      { name: "Vending Machine prüfen ob alles gefüllt ist + Münzen wechseln", status: "✔" },
+      { name: "Barkasse Micros \"End of Day\" ca. um 1 Uhr + MA zuweisen für nächsten Tag", status: "✔" },
+      { name: "Bar schließen (Bar säubern, Flaschen auffüllen, aufräumen usw., s. BQRKB)", status: "✔" },
+      { name: "Kaffeemachine reinigen + Milch checken und beschriften", status: "✔" },
+      { name: "Save the Planet Tabellen bearbeiten", status: "✔" },
+      { name: "Meldescheine aussortieren", status: "✔" },
+      { name: "16. Zimmer zuteilen für die Anreisen + 3Pax/ ASB vermerken auf HSK Liste + malen", status: "✔" },
+      { name: "Parkplatzliste aktualisieren", status: "✔" },
+      { name: "Bartische und ggf. Restaurant eindecken für Frühstück", status: "✔" },
+      { name: "End of Day (ca. um 4 Uhr, wenn alle Anreisen da sind)", status: "✔" },
+      { name: `Listen drucken:\n1. Housekeeping Listen: (2x Departures -> Expected Departures + Forecast -> Management -> Housestatus -> Forecast 7 Days)\n2. Frühstücksliste (Management -> Journal by Cashier and Transaction Code -> Edit and use codes 1002, 11, 15, 154, 161, 19 Breakfast by room)`, status: "✔" },
+      { name: "Gruppenanreisen vorbereiten (ggf. Karten kodieren, Namensliste erstellen)", status: "–" },
+      { name: "Opera: KCSA Report (negative postings), Reservation with Discounts\nMicros: Consolidated House financial, Voids and Refunds Report, Discount detail report", status: "" },
+      { name: "Sicherheitscheckliste ausfüllen", status: "–" },
+      { name: "Kasse zählen und Übergabe mit Frühschicht / Masterkey Kontrolle", status: "–" },
+      { name: "Lichtszene um 6 Uhr auf Tagsüber ändern", status: "✔" },
+      { name: "LogOut in Dayforce", status: "✔" }
+    ];
+
+    const checklistTable = document.getElementById("checklistTable");
+
+    // Build table rows from data
+    data.forEach(item => {
+      const row = document.createElement("tr");
+
+      const taskCell = document.createElement("td");
+      taskCell.textContent = item.name;
+
+      const checkboxCell = document.createElement("td");
+      const checkbox = document.createElement("input");
+      checkbox.type = "checkbox";
+      checkbox.checked = item.status === "✔";
+      checkboxCell.appendChild(checkbox);
+
+      row.appendChild(taskCell);
+      row.appendChild(checkboxCell);
+      checklistTable.appendChild(row);
+    });
+
+    const tbody = document.querySelector("#checklistTable tbody");
+
+data.forEach(entry => {
+  const row = document.createElement("tr");
+
+  const taskCell = document.createElement("td");
+  taskCell.textContent = entry.name;
+
+  const statusCell = document.createElement("td");
+  const checkbox = document.createElement("input");
+  checkbox.type = "checkbox";
+  checkbox.checked = entry.status === "✔";
+  statusCell.appendChild(checkbox);
+
+  row.appendChild(taskCell);
+  row.appendChild(statusCell);
+  tbody.appendChild(row);
+});
+
+function checkAll(shouldCheck) {
+  const checkboxes = document.querySelectorAll("#checklistTable input[type='checkbox']");
+  checkboxes.forEach(cb => cb.checked = shouldCheck);
+}
+
+async function exportToPDF() {
+  try {
+    const { PDFDocument, StandardFonts, rgb } = PDFLib;
+
+    const existingPdfBytes = await fetch("checklisttemplate.pdf").then(res => res.arrayBuffer());
+    const pdfDoc = await PDFDocument.load(existingPdfBytes);
+    const pages = pdfDoc.getPages();
+    const firstPage = pages[0];
+    const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
+    const { width, height } = firstPage.getSize();
+
+    const checkboxes = document.querySelectorAll("#checklistTable input[type='checkbox']");
+    const dateValue = document.getElementById("dateInput").value;
+
+    // ✅ Draw date on the top-right of the page
+    if (dateValue) {
+      firstPage.drawText(`${dateValue}`, {
+        x: width - 500, // adjust if needed
+        y: height - 719,
+        size: 12,
+        font,
+        color: rgb(0, 0, 0),
+      });
+    }
+
+    // Coordinates for each checkbox
+    const checkboxPositions = [
+      { x: 543, y: 713 }, { x: 543, y: 690 }, { x: 543, y: 668 }, { x: 543, y: 653 },
+      { x: 543, y: 638 }, { x: 543, y: 623 }, { x: 543, y: 608 }, { x: 543, y: 593 },
+      { x: 543, y: 578 }, { x: 543, y: 555 }, { x: 543, y: 533 }, { x: 543, y: 518 },
+      { x: 543, y: 503 }, { x: 543, y: 488 }, { x: 543, y: 473 }, { x: 543, y: 457 },
+      { x: 543, y: 440 }, { x: 543, y: 423 }, { x: 543, y: 406 }, { x: 543, y: 390 },
+      { x: 543, y: 350 }, { x: 543, y: 299 }, { x: 543, y: 268 }, { x: 543, y: 239 },
+      { x: 543, y: 224 }, { x: 543, y: 209 }, { x: 543, y: 194 }
+    ];
+
+    // Loop through checkboxes and draw
+    for (let i = 0; i < checkboxes.length; i++) {
+      const isChecked = checkboxes[i].checked;
+      const pos = checkboxPositions[i];
+      if (pos) {
+        firstPage.drawText(isChecked ? "X" : "-", {
+          x: pos.x,
+          y: pos.y,
+          size: 12,
+          font,
+          color: rgb(0, 0, 0),
+        });
+      }
+    }
+
+    const pdfBytes = await pdfDoc.save();
+    const blob = new Blob([pdfBytes], { type: 'application/pdf' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "checklist-filled.pdf";
+    link.click();
+    URL.revokeObjectURL(url);
+  } catch (err) {
+    console.error("Error while generating PDF:", err);
+    alert("Error generating PDF. Check console.");
+  }
+}
+
+  
+  </script>
+
+</body>
+</html>
